@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdint.h>
 
 int main(){
@@ -16,8 +16,8 @@ int main(){
 char* DES_encrypt(char* plaintext, char* key){
     // Plaintext is 64 bits. Do initial Permutation.
     // TODO fix indexing
-    uint8_t L_0[32];
-    uint8_t R_0[32];
+    uint32_t L_0;
+    uint32_t R_0;
     int i;
     for(i = 0; i < 32; i++){ 
         L_0[i] = plaintext[i];
@@ -34,22 +34,53 @@ char* DES_encrypt(char* plaintext, char* key){
     }
 }
 
-uint8_t* DES_key_transform(uint8_t k, round){
+uint64_t* key_schedule(uint64_t key, int round){ 
+    //key is 64bits with parity bits. left/right are 28.
     int i;
-    for(i = 0; i < 28; i++){
-        C[i] = k[i];
-        D[i] = k[i+28];
+    uint32_t C, D;
+    uint64_t key_round[16];
+    // Permutation Choice 1
+    // TODO: do this with bit ops?
+    // TODO: do this with delta options. See:
+    // https://reflectionsonsecurity.wordpress.com/2014/05/11/efficient-bit-permutation-using-delta-swaps/
+    for(i = 0; i < 56; i++){
+        key[i] = key[PC_1_table[i]];
     }
-    if(round == 0 || round == 1 || round == 8 || round == 15){
-        //Shift 1 bit
-    } else {
-        //Shift 2 bit
-
+    //for(i = 0; i < 28; i++){
+    //    C[i] = key[i];
+    //    D[i] = key[i+28];
+    //}
+    // 0xFFFFFFF is 28 1's
+    C = (key >> 28) & 0xFFFFFFF;
+    D = key & 0xFFFFFFF;
+    
+    // 16 Key rounds
+    for(i = 0; i < 16; i++){
+        if(i == 0 || i == 1 || i == 8 || i == 15){
+            //Rotate 1 bit left
+            C = (C << 1) & 0xFFFFFFF | (C >> 27) & 0xFFFFFFF;
+            D = (D << 1) & 0xFFFFFFF | (D >> 27) & 0xFFFFFFF;
+        } else {
+            //Rotate 2 bit left
+            C = (C << 2) & 0xFFFFFFF | (C >> 26) & 0xFFFFFFF;
+            D = (D << 2) & 0xFFFFFFF | (D >> 26) & 0xFFFFFFF;
+        }
+        // Concatenate with bit ops
+        uint64_t CD = (C << 28) | D;
+        // Permuted Choice 2
+        key_round[i] = 0
+        for(int j = 0; j < 48; j++){
+            //key_round[i][j] = CD[PC_2_table[j]];
+            //PC_2_table[j] //gives an int to move the shit to.
+            //TODO: do this with delta swaps
+            sub_key[i] <<= 1;
+            sub_key[i] |= (CD >> (56-PC2[j])) & LB64_MASK;
+        }
     }
     return key_out;
 };
 
-uint8_t* DES_round_function(uint8_t* R, uint8_t* key){
+uint8_t* f_function(uint8_t* R, uint8_t* key){
     s_input = f_expansion(R) ^ k;
     // S1 to S8
     for(int i = 0; i < 8; i++){
