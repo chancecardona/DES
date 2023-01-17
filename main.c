@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#define DELTA_SWAP(a, b, delta, mask)   \
+    b = (a ^ (a << delta)) & mask;      \
+    a = a ^ b ^ (b >> delta);
+
+
 int main(){
     // Get Key (file or string)
     
@@ -15,15 +20,29 @@ int main(){
 
 char* DES_encrypt(char* plaintext, char* key){
     // Plaintext is 64 bits. Do initial Permutation.
+    // key is 64bits
     // TODO fix indexing
     uint32_t L_0;
     uint32_t R_0;
     int i;
-    for(i = 0; i < 32; i++){ 
-        L_0[i] = plaintext[i];
-        R_0[i] = plaintext[i+32];
+    // Do key generation
     key = PC_1(key);
     k_0 = DES_key_transform(key);
+    // Do IP with 5 delta swaps
+    uint64_t B;
+    uint64_t ciphertext = plaintext;
+    uint64_t MASK1 = 0xAA00AA00AA00AA00;
+    uint64_t MASK2 = 0xCCCC0000CCCC0000;
+    uint64_t MASK3 = 0x000000000F0F0F0F;
+    uint64_t MASK4 = 0x00FF00FF00000000;
+    uint64_t MASK5 = 0xFF000000FF000000;
+    DELTA_SWAP(ciphertext, B, 9, MASK1);
+    DELTA_SWAP(ciphertext, B, 18, MASK2);
+    DELTA_SWAP(ciphertext, B, 36, MASK3);
+    DELTA_SWAP(ciphertext, B, 24, MASK4);
+    DELTA_SWAP(ciphertext, B, 24, MASK5);
+    L0 = ciphertext >> 64;
+    R0 = ciphertext & 0xFFFFFFFF;
     L_1 = R_0;
     R_1 = L_0 ^ DES_round_function(R_0, k_0);
     //TODO continue looping.
@@ -42,9 +61,10 @@ uint64_t* key_schedule(uint64_t key, int round){
     // Permutation Choice 1
     // TODO: do this with delta options. See:
     // https://reflectionsonsecurity.wordpress.com/2014/05/11/efficient-bit-permutation-using-delta-swaps/
-    for(i = 0; i < 56; i++){
-        key[i] = key[PC_1_table[i]];
-    }
+    uint64_t B;
+
+    DELTA_SWAP(key, B, 
+    //
     //for(i = 0; i < 28; i++){
     //    C[i] = key[i];
     //    D[i] = key[i+28];
