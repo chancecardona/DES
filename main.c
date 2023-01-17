@@ -40,7 +40,6 @@ uint64_t* key_schedule(uint64_t key, int round){
     uint32_t C, D;
     uint64_t key_round[16];
     // Permutation Choice 1
-    // TODO: do this with bit ops?
     // TODO: do this with delta options. See:
     // https://reflectionsonsecurity.wordpress.com/2014/05/11/efficient-bit-permutation-using-delta-swaps/
     for(i = 0; i < 56; i++){
