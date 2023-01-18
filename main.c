@@ -56,20 +56,14 @@ char* DES_encrypt(char* plaintext, char* key){
 uint64_t* key_schedule(uint64_t key, int round){ 
     //key is 64bits with parity bits. left/right are 28.
     int i;
-    uint32_t C, D;
-    uint64_t key_round[16];
+    uint32_t C, D; // Each 28 bits
+    uint64_t CD; // 56
+    uint64_t sub_key[16]; // 56 each, can do more efficiently.
     // Permutation Choice 1
-    // TODO: do this with delta options. See:
-    // https://reflectionsonsecurity.wordpress.com/2014/05/11/efficient-bit-permutation-using-delta-swaps/
-    uint64_t B;
+    // TODO: do this with better bit opt's to take advantage of PC-1's structure (mult 8).
+    // Choosing not to here due to (imo unneeded) complexity. 
+    // Hardware would change this. See https://github.com/FreeApophis/TrueCrypt/blob/master/Crypto/Des.c#L261
 
-    DELTA_SWAP(key, B, 
-    //
-    //for(i = 0; i < 28; i++){
-    //    C[i] = key[i];
-    //    D[i] = key[i+28];
-    //}
-    // 0xFFFFFFF is 28 1's
     C = (key >> 28) & 0xFFFFFFF;
     D = key & 0xFFFFFFF;
     
@@ -84,19 +78,19 @@ uint64_t* key_schedule(uint64_t key, int round){
             C = (C << 2) & 0xFFFFFFF | (C >> 26) & 0xFFFFFFF;
             D = (D << 2) & 0xFFFFFFF | (D >> 26) & 0xFFFFFFF;
         }
-        // Concatenate with bit ops
-        uint64_t CD = (C << 28) | D;
+        // Concatenate
+        CD = (C << 28) | D;
         // Permuted Choice 2
-        key_round[i] = 0
+        sub_key[i] = 0
         for(int j = 0; j < 48; j++){
-            //key_round[i][j] = CD[PC_2_table[j]];
-            //PC_2_table[j] //gives an int to move the shit to.
-            //TODO: do this with delta swaps
+            // TODO: do this with better bit opts to take advantage of PC-2 structure.
+            // Currently just (for a given subkey) shift each bit by index to do what we want.
+            // Can use sheeps and goats method, etc.
             sub_key[i] <<= 1;
-            sub_key[i] |= (CD >> (56-PC2[j])) & LB64_MASK;
+            sub_key[i] |= (CD >> (56-PC_2[j])) & 0x1;
         }
     }
-    return key_out;
+    return sub_key;
 };
 
 uint8_t* f_function(uint8_t* R, uint8_t* key){
