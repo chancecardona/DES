@@ -6,143 +6,6 @@
     b = (a ^ (a << delta)) & mask;      \
     a = a ^ b ^ (b >> delta);
 
-
-int main(){
-    // Get Key (file or string)
-    
-    // Get Plaintext
-    
-    // Call DES_crypt for each 64 bit chunk
-    ciphertext = DES_encrypt(plaintext, key); 
-    // Put Ciphertext
-    printf("{}", ciphertext);
-}
-
-char* DES_encrypt(char* plaintext, char* key){
-    // Plaintext is 64 bits. Do initial Permutation.
-    // key is 64bits
-    // TODO fix indexing
-    register int i;
-    uint32_t L, R, tmp;
-
-    // Key generation
-    uint64_t sub_keys[16] = key_schedule(key);
-
-    // Do IP of plaintext with 5 delta swaps
-    uint64_t B;
-    uint64_t ciphertext = plaintext;
-    uint64_t MASK1 = 0xAA00AA00AA00AA00;
-    uint64_t MASK2 = 0xCCCC0000CCCC0000;
-    uint64_t MASK3 = 0x000000000F0F0F0F;
-    uint64_t MASK4 = 0x00FF00FF00000000;
-    uint64_t MASK5 = 0xFF000000FF000000;
-    DELTA_SWAP(ciphertext, B, 9, MASK1);
-    DELTA_SWAP(ciphertext, B, 18, MASK2);
-    DELTA_SWAP(ciphertext, B, 36, MASK3);
-    DELTA_SWAP(ciphertext, B, 24, MASK4);
-    DELTA_SWAP(ciphertext, B, 24, MASK5);
-    L = ciphertext >> 32 & 0xFFFFFFFF; // 32 1's
-    R = ciphertext & 0xFFFFFFFF;
-    
-    for(i = 0; i < 16; i++){
-       tmp = R;
-       R = f_function(R, sub_keys[i]) ^ L;
-       L = tmp;
-    }
-
-    ciphertext = R >> 32 | L;
-
-    // Do FP now with 5 delta swaps.
-}
-
-uint64_t* key_schedule(uint64_t key, int round){ 
-    //key is 64bits with parity bits. left/right are 28.
-    register int i, j;
-    uint32_t C, D; // Each 28 bits
-    uint64_t CD; // 56
-    uint64_t sub_key[16]; // 56 each, can do more efficiently.
-    // Permutation Choice 1
-    // TODO: do this with better bit opt's to take advantage of PC-1's structure (mult 8).
-    // Choosing not to here due to (imo unneeded) complexity. 
-    // Hardware would change this. See https://github.com/FreeApophis/TrueCrypt/blob/master/Crypto/Des.c#L261
-
-    C = (key >> 28) & 0xFFFFFFF; // 28 1's
-    D = key & 0xFFFFFFF;
-    
-    // 16 Key rounds
-    for(i = 0; i < 16; i++){
-        if(i == 0 || i == 1 || i == 8 || i == 15){
-            //Rotate 1 bit left
-            C = (C << 1) & 0xFFFFFFF | (C >> 27) & 0xFFFFFFF;
-            D = (D << 1) & 0xFFFFFFF | (D >> 27) & 0xFFFFFFF;
-        } else {
-            //Rotate 2 bit left
-            C = (C << 2) & 0xFFFFFFF | (C >> 26) & 0xFFFFFFF;
-            D = (D << 2) & 0xFFFFFFF | (D >> 26) & 0xFFFFFFF;
-        }
-        // Concatenate
-        CD = (C << 28) | D;
-        // Permuted Choice 2
-        sub_key[i] = 0
-        for(j = 0; j < 48; j++){
-            // TODO: do this with better bit opts to take advantage of PC-2 structure.
-            // Currently just (for a given subkey) shift each bit by index to do what we want.
-            // Can use sheeps and goats method, etc.
-            sub_key[i] <<= 1;
-            sub_key[i] |= (CD >> (56-PC_2[j])) & 0x1;
-        }
-    }
-    return sub_key;
-};
-
-// TODO: update to correct type
-uint8_t* f_function(uint32_t* R, uint8_t* key){
-    // Expansion.
-    s_input = f_expansion(R, E_table) ^ k;
-    // Substitution (S1 to S8)
-    for(int i = 0; i < 8; i++){
-        // Have array of S functions. Pass ptr with size (6b) to each. 
-        // Returns a ptr with size (4b).
-        s_output[i*4] = f_s(i, s_input[i*6]);
-    }
-    // Permutation
-    return f_permutation(s_output);
-}
-// TODO: change data types of these to match
-// 32b in, 48b out
-uint8_t* f_expansion(uint8_t* x, uint8_t* e_table){
-    uint8_t[48] y;
-    for(int i = 0; i < 48; i++){
-        y[i] = x[e_table[i] - 1];
-    }
-    return y;
-}
-// 32b in, 32b out
-uint8_t* f_permutation(uint8_t* x, uint8_t* p_table){
-    // TODO: just operate on x by reference?
-    uint8_t[32] y;
-    for(int i = 0; i < 32; i++){
-        y[i] = x[p_table[i] - 1];
-    }
-    return y;
-}
-// x is 6 bits, y is 4 bits.
-uint8_t* f_S(int s_index, uint8_t* x){
-    // Use binary array to get indices
-    int i;
-    int col_index; 
-    int row_index; 
-    uint8_t y[4];
-    for(i = 1; i <= 4; i++){
-        col_index *= 2;
-        col_index += x[i];
-    }
-    row_index = x[0]*2 + x[5];
-    // TODO: do this a better way or move this.
-    static const uint8_t** S_table = { S1_table, S2_table, S3_table, S4_table, S5_table, S6_table, S7_table, S8_table };
-    y[0] = S_table[s_index][col_index + 16*row_index];
-}
-
 static uint8_t IP_table[64] = { 58, 50, 42, 34, 26, 18, 10,  2, 
                                 60, 52, 44, 36, 28, 20, 12,  4, 
                                 62, 54, 46, 38, 30, 22, 14,  6, 
@@ -219,4 +82,148 @@ static uint8_t PC_2_table[48] = { 14, 17, 11, 24, 1,  5,  3,  28,
                                   41, 52, 31, 37, 47, 55, 30, 40,
                                   51, 45, 33, 48, 44, 49, 39, 56,
                                   34, 53, 46, 42, 50, 36, 29, 32 };
+
+
+int main(){
+    // Get Key (file or string)
+    
+    // Get Plaintext
+    
+    // Call DES_crypt for each 64 bit chunk
+    ciphertext = DES_encrypt(plaintext, key); 
+    // Put Ciphertext
+    printf("{}", ciphertext);
+}
+
+char* DES_encrypt(char* plaintext, char* key){
+    // Plaintext is 64 bits. Do initial Permutation.
+    // key is 64bits
+    // TODO fix indexing
+    register int i;
+    uint32_t L, R, tmp;
+
+    // Key generation
+    uint64_t sub_keys[16] = key_schedule(key);
+
+    // Do IP of plaintext with 5 delta swaps
+    uint64_t B;
+    uint64_t ciphertext = plaintext;
+    uint64_t MASK1 = 0xAA00AA00AA00AA00;
+    uint64_t MASK2 = 0xCCCC0000CCCC0000;
+    uint64_t MASK3 = 0x000000000F0F0F0F;
+    uint64_t MASK4 = 0x00FF00FF00000000;
+    uint64_t MASK5 = 0xFF000000FF000000;
+    DELTA_SWAP(ciphertext, B,  9, MASK1);
+    DELTA_SWAP(ciphertext, B, 18, MASK2);
+    DELTA_SWAP(ciphertext, B, 36, MASK3);
+    DELTA_SWAP(ciphertext, B, 24, MASK4);
+    DELTA_SWAP(ciphertext, B, 24, MASK5);
+    L = ciphertext >> 32 & 0xFFFFFFFF; // 32 1's
+    R = ciphertext & 0xFFFFFFFF;
+    
+    for(i = 0; i < 16; i++){
+       tmp = R;
+       R = f_function(R, sub_keys[i]) ^ L;
+       L = tmp;
+    }
+
+    ciphertext = R >> 32 | L;
+
+    // Do FP now with 5 delta swaps in reverse order.
+    DELTA_SWAP(ciphertext, B, 24, MASK5);
+    DELTA_SWAP(ciphertext, B, 24, MASK4);
+    DELTA_SWAP(ciphertext, B, 36, MASK3);
+    DELTA_SWAP(ciphertext, B, 18, MASK2);
+    DELTA_SWAP(ciphertext, B,  9, MASK1);
+}
+
+uint64_t* key_schedule(uint64_t key, int round){ 
+    //key is 64bits with parity bits. left/right are 28.
+    register int i, j;
+    uint32_t C, D; // Each 28 bits
+    uint64_t CD; // 56
+    uint64_t sub_key[16]; // 56 each, can do more efficiently.
+    // Permutation Choice 1
+    // TODO: do this with better bit opt's to take advantage of PC-1's structure (mult 8).
+    // Choosing not to here due to (imo unneeded) complexity. 
+    // Hardware would change this. See https://github.com/FreeApophis/TrueCrypt/blob/master/Crypto/Des.c#L261
+
+    C = (key >> 28) & 0xFFFFFFF; // 28 1's
+    D = key & 0xFFFFFFF;
+    
+    // 16 Key rounds
+    for(i = 0; i < 16; i++){
+        if(i == 0 || i == 1 || i == 8 || i == 15){
+            //Rotate 1 bit left
+            C = (C << 1) & 0xFFFFFFF | (C >> 27) & 0xFFFFFFF;
+            D = (D << 1) & 0xFFFFFFF | (D >> 27) & 0xFFFFFFF;
+        } else {
+            //Rotate 2 bit left
+            C = (C << 2) & 0xFFFFFFF | (C >> 26) & 0xFFFFFFF;
+            D = (D << 2) & 0xFFFFFFF | (D >> 26) & 0xFFFFFFF;
+        }
+        // Concatenate
+        CD = (C << 28) | D;
+        // Permuted Choice 2
+        sub_key[i] = 0
+        for(j = 0; j < 48; j++){
+            // TODO: do this with better bit opts to take advantage of PC-2 structure.
+            // Currently just (for a given subkey) shift each bit by index to do what we want.
+            // Can use sheeps and goats method, etc.
+            sub_key[i] <<= 1;
+            sub_key[i] |= (CD >> (56-PC_2[j])) & 0x1;
+        }
+    }
+    return sub_key;
+};
+
+// TODO: update to correct type
+uint32_t f_function(uint32_t R, uint8_t* key){
+    // Expansion.
+    s_input = f_expansion(R, E_table) ^ k;
+    // Substitution (S1 to S8)
+    for(int i = 0; i < 8; i++){
+        // Have array of S functions. Pass ptr with size (6b) to each. 
+        // Returns a ptr with size (4b).
+        s_output[i*4] = f_s(i, s_input[i*6]);
+    }
+    // Permutation
+    return f_permutation(s_output);
+}
+// 32b in, 48b out
+uint32_t f_expansion(uint32_t x, uint8_t* e_table){
+    uint32_t y;
+// TODO: update to bit ops
+    for(int i = 0; i < 48; i++){
+        y[i] = x[e_table[i] - 1];
+    }
+    return y;
+}
+// 32b in, 32b out
+uint8_t* f_permutation(uint8_t* x, uint8_t* p_table){
+    // TODO: just operate on x by reference?
+    // TODO: update to bit ops
+    uint8_t[32] y;
+    for(int i = 0; i < 32; i++){
+        y[i] = x[p_table[i] - 1];
+    }
+    return y;
+}
+// TODO: update to bit ops
+// x is 6 bits, y is 4 bits.
+uint8_t* f_S(int s_index, uint8_t* x){
+    // Use binary array to get indices
+    int i;
+    int col_index; 
+    int row_index; 
+    uint8_t y[4];
+    for(i = 1; i <= 4; i++){
+        col_index *= 2;
+        col_index += x[i];
+    }
+    row_index = x[0]*2 + x[5];
+    // TODO: do this a better way or move this.
+    static const uint8_t** S_table = { S1_table, S2_table, S3_table, S4_table, S5_table, S6_table, S7_table, S8_table };
+    y[0] = S_table[s_index][col_index + 16*row_index];
+}
 
