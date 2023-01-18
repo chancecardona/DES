@@ -12,7 +12,7 @@ int main(){
     
     // Get Plaintext
     
-    // Call DES
+    // Call DES_crypt for each 64 bit chunk
     ciphertext = DES_encrypt(plaintext, key); 
     // Put Ciphertext
     printf("{}", ciphertext);
@@ -22,13 +22,13 @@ char* DES_encrypt(char* plaintext, char* key){
     // Plaintext is 64 bits. Do initial Permutation.
     // key is 64bits
     // TODO fix indexing
-    uint32_t L_0;
-    uint32_t R_0;
-    int i;
-    // Do key generation
-    key = PC_1(key);
-    k_0 = DES_key_transform(key);
-    // Do IP with 5 delta swaps
+    register int i;
+    uint32_t L, R, tmp;
+
+    // Key generation
+    uint64_t sub_keys[16] = key_schedule(key);
+
+    // Do IP of plaintext with 5 delta swaps
     uint64_t B;
     uint64_t ciphertext = plaintext;
     uint64_t MASK1 = 0xAA00AA00AA00AA00;
@@ -41,21 +41,23 @@ char* DES_encrypt(char* plaintext, char* key){
     DELTA_SWAP(ciphertext, B, 36, MASK3);
     DELTA_SWAP(ciphertext, B, 24, MASK4);
     DELTA_SWAP(ciphertext, B, 24, MASK5);
-    L0 = ciphertext >> 64;
-    R0 = ciphertext & 0xFFFFFFFF;
-    L_1 = R_0;
-    R_1 = L_0 ^ DES_round_function(R_0, k_0);
-    //TODO continue looping.
+    L = ciphertext >> 32 & 0xFFFFFFFF; // 32 1's
+    R = ciphertext & 0xFFFFFFFF;
+    
     for(i = 0; i < 16; i++){
-        key = DES_key_transform(key, i);
-        L_i = R;
-        R = L_0 ^ DES_round_function(key, R);
+       tmp = R;
+       R = f_function(R, sub_keys[i]) ^ L;
+       L = tmp;
     }
+
+    ciphertext = R >> 32 | L;
+
+    // Do FP now with 5 delta swaps.
 }
 
 uint64_t* key_schedule(uint64_t key, int round){ 
     //key is 64bits with parity bits. left/right are 28.
-    int i;
+    register int i, j;
     uint32_t C, D; // Each 28 bits
     uint64_t CD; // 56
     uint64_t sub_key[16]; // 56 each, can do more efficiently.
@@ -64,7 +66,7 @@ uint64_t* key_schedule(uint64_t key, int round){
     // Choosing not to here due to (imo unneeded) complexity. 
     // Hardware would change this. See https://github.com/FreeApophis/TrueCrypt/blob/master/Crypto/Des.c#L261
 
-    C = (key >> 28) & 0xFFFFFFF;
+    C = (key >> 28) & 0xFFFFFFF; // 28 1's
     D = key & 0xFFFFFFF;
     
     // 16 Key rounds
@@ -82,7 +84,7 @@ uint64_t* key_schedule(uint64_t key, int round){
         CD = (C << 28) | D;
         // Permuted Choice 2
         sub_key[i] = 0
-        for(int j = 0; j < 48; j++){
+        for(j = 0; j < 48; j++){
             // TODO: do this with better bit opts to take advantage of PC-2 structure.
             // Currently just (for a given subkey) shift each bit by index to do what we want.
             // Can use sheeps and goats method, etc.
@@ -93,9 +95,11 @@ uint64_t* key_schedule(uint64_t key, int round){
     return sub_key;
 };
 
-uint8_t* f_function(uint8_t* R, uint8_t* key){
-    s_input = f_expansion(R) ^ k;
-    // S1 to S8
+// TODO: update to correct type
+uint8_t* f_function(uint32_t* R, uint8_t* key){
+    // Expansion.
+    s_input = f_expansion(R, E_table) ^ k;
+    // Substitution (S1 to S8)
     for(int i = 0; i < 8; i++){
         // Have array of S functions. Pass ptr with size (6b) to each. 
         // Returns a ptr with size (4b).
@@ -104,6 +108,7 @@ uint8_t* f_function(uint8_t* R, uint8_t* key){
     // Permutation
     return f_permutation(s_output);
 }
+// TODO: change data types of these to match
 // 32b in, 48b out
 uint8_t* f_expansion(uint8_t* x, uint8_t* e_table){
     uint8_t[48] y;
