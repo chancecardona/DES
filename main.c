@@ -1,6 +1,6 @@
-#include <des.h>
 #include <stdio.h>
 #include <stdint.h>
+#include "des.h"
 
 int main(int argc, const char * argv[]){
     // Get Key (file or string) 

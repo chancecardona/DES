@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
+#include "des.h"
 
 #define DELTA_SWAP(a, b, delta, mask)   \
     b = (a ^ (a << delta)) & mask;      \
@@ -30,7 +31,7 @@ static uint8_t E_table[48] = { 32,  1,  2,  3,  4,  5,
                                16, 17, 18, 19, 20, 21,
                                20, 21, 22, 23, 24, 25,
                                24, 25, 26, 27, 28, 29,
-                               28, 29, 30, 31, 32,  1 }
+                               28, 29, 30, 31, 32,  1 };
 
 static uint8_t P_table[32] = { 16,  7, 20, 21, 29, 12, 28, 17, 
                                 1, 15, 23, 26,  5, 18, 31, 10,
@@ -84,7 +85,7 @@ static uint8_t PC_2_table[48] = { 14, 17, 11, 24, 1,  5,  3,  28,
                                   34, 53, 46, 42, 50, 36, 29, 32 };
 
 
-char* DES_encrypt(char* plaintext, char* key){
+uint64_t DES_encrypt(uint64_t plaintext, uint64_t key){
     // Plaintext is 64 bits. Do initial Permutation.
     // key is 64bits
     // TODO fix indexing
@@ -92,7 +93,8 @@ char* DES_encrypt(char* plaintext, char* key){
     uint32_t L, R, tmp;
 
     // Key generation
-    uint64_t sub_keys[16] = key_schedule(key);
+    uint64_t sub_keys[16] = {0};
+    key_schedule(key, sub_keys);
 
     // Do IP of plaintext with 5 delta swaps
     uint64_t B;
@@ -116,7 +118,7 @@ char* DES_encrypt(char* plaintext, char* key){
        L = tmp;
     }
 
-    ciphertext = R >> 32 | L;
+    ciphertext = (uint64_t) R >> 32 | L;
 
     // Do FP now with 5 delta swaps in reverse order.
     DELTA_SWAP(ciphertext, B, 24, MASK5);
@@ -124,14 +126,15 @@ char* DES_encrypt(char* plaintext, char* key){
     DELTA_SWAP(ciphertext, B, 36, MASK3);
     DELTA_SWAP(ciphertext, B, 18, MASK2);
     DELTA_SWAP(ciphertext, B,  9, MASK1);
+    return ciphertext;
 }
 
-uint64_t* key_schedule(uint64_t key){ 
+// sub_key is 16 * 56 bits
+void key_schedule(uint64_t key, uint64_t* sub_key){ 
     //key is 64bits with parity bits. left/right are 28.
     register int i, j;
     uint32_t C, D; // Each 28 bits
     uint64_t CD; // 56
-    uint64_t sub_key[16]; // 56 each, can do more efficiently.
     // Permutation Choice 1
     // TODO: do this with better bit opt's to take advantage of PC-1's structure (mult 8).
     // Choosing not to here due to (imo unneeded) complexity. 
@@ -154,17 +157,16 @@ uint64_t* key_schedule(uint64_t key){
         // Concatenate
         CD = (C << 28) | D;
         // Permuted Choice 2
-        sub_key[i] = 0
+        sub_key[i] = 0;
         for(j = 0; j < 48; j++){
             // TODO: do this with better bit opts to take advantage of PC-2 structure.
             // Currently just (for a given subkey) shift each bit by index to do what we want.
             // Can use sheeps and goats method, etc.
             sub_key[i] <<= 1;
-            sub_key[i] |= (CD >> (56-PC_2[j])) & 0x1;
+            sub_key[i] |= (CD >> (56 - PC_2_table[j])) & 0x1;
         }
     }
-    return sub_key;
-};
+}
 
 uint32_t f_function(uint32_t R, uint64_t sub_key){
     register int i, j;
@@ -174,7 +176,8 @@ uint32_t f_function(uint32_t R, uint64_t sub_key){
     s_input = f_expansion(R) ^ sub_key;
     // Substitution (S1 to S8)
     // Each takes 6bits. 0x3F is 6 1's.
-    // 64 bits. 48 useful. 48 >> 
+    // 64 bits. 48 useful. Can this be done better using S_tables
+    // structure?
     for(i = 7; i >= 0; i--){
         s_output <<= 4;
         s_output |= f_S(i, (s_input >> 6*i) & 0x3F);
@@ -214,7 +217,7 @@ uint8_t f_S(int s_index, uint8_t x){
     row_index = (x >> 5 & 0x1) << 1 | (x & 0x1);
     col_index = (x >> 1) & 0xF;
     // Get number from S_table and take last 4 bits.
-    y = S[s_index][row_index * 16 + col_index] & 0x0F; 
+    y = S_table[s_index][row_index * 16 + col_index] & 0x0F; 
     return y;
 }
 
