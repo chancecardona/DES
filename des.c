@@ -93,8 +93,10 @@ uint64_t DES_encrypt(uint64_t plaintext, uint64_t key){
     uint32_t L, R, tmp;
 
     // Key generation
-    uint64_t sub_keys[16] = {0};
-    key_schedule(key, sub_keys);
+    uint64_t sub_key[16] = {0};
+    key_schedule(key, sub_key);
+    printf("KEY %016llx\n", key);
+    printf("SUBKEYS 0: %016llx\n", sub_key[0]);
 
     // Do IP of plaintext with 5 delta swaps
     uint64_t B;
@@ -114,7 +116,7 @@ uint64_t DES_encrypt(uint64_t plaintext, uint64_t key){
     
     for(i = 0; i < 16; i++){
        tmp = R;
-       R = f_function(R, sub_keys[i]) ^ L;
+       R = f_function(R, sub_key[i]) ^ L;
        L = tmp;
     }
 
