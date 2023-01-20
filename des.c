@@ -7,6 +7,10 @@
     b = (a ^ (a << delta)) & mask;      \
     a = a ^ b ^ (b >> delta);
 
+#define DELTA_SWAP_TWO(a, b, delta, mask)   \
+    b = (a ^ (a >> delta)) & mask;      \
+    a = a ^ b ^ (b << delta);
+
 static uint8_t IP_table[64] = { 58, 50, 42, 34, 26, 18, 10,  2, 
                                 60, 52, 44, 36, 28, 20, 12,  4, 
                                 62, 54, 46, 38, 30, 22, 14,  6, 
@@ -84,53 +88,6 @@ static uint8_t PC_2_table[48] = { 14, 17, 11, 24, 1,  5,  3,  28,
                                   51, 45, 33, 48, 44, 49, 39, 56,
                                   34, 53, 46, 42, 50, 36, 29, 32 };
 
-
-uint64_t DES_encrypt(uint64_t plaintext, uint64_t key){
-    // Plaintext is 64 bits. Do initial Permutation.
-    // key is 64bits
-    // TODO fix indexing
-    register int i;
-    uint32_t L, R, tmp;
-
-    // Key generation
-    uint64_t sub_key[16] = {0};
-    key_schedule(key, sub_key);
-    printf("KEY %016llx\n", key);
-    printf("SUBKEYS 0: %016llx\n", sub_key[0]);
-
-    // Do IP of plaintext with 5 delta swaps
-    uint64_t B;
-    uint64_t ciphertext = plaintext;
-    uint64_t MASK1 = 0xAA00AA00AA00AA00;
-    uint64_t MASK2 = 0xCCCC0000CCCC0000;
-    uint64_t MASK3 = 0x000000000F0F0F0F;
-    uint64_t MASK4 = 0x00FF00FF00000000;
-    uint64_t MASK5 = 0xFF000000FF000000;
-    DELTA_SWAP(ciphertext, B,  9, MASK1);
-    DELTA_SWAP(ciphertext, B, 18, MASK2);
-    DELTA_SWAP(ciphertext, B, 36, MASK3);
-    DELTA_SWAP(ciphertext, B, 24, MASK4);
-    DELTA_SWAP(ciphertext, B, 24, MASK5);
-    L = ciphertext >> 32 & 0xFFFFFFFF; // 32 1's
-    R = ciphertext & 0xFFFFFFFF;
-    
-    for(i = 0; i < 16; i++){
-       tmp = R;
-       R = f_function(R, sub_key[i]) ^ L;
-       L = tmp;
-    }
-
-    ciphertext = (uint64_t) R >> 32 | L;
-
-    // Do FP now with 5 delta swaps in reverse order.
-    DELTA_SWAP(ciphertext, B, 24, MASK5);
-    DELTA_SWAP(ciphertext, B, 24, MASK4);
-    DELTA_SWAP(ciphertext, B, 36, MASK3);
-    DELTA_SWAP(ciphertext, B, 18, MASK2);
-    DELTA_SWAP(ciphertext, B,  9, MASK1);
-    return ciphertext;
-}
-
 // sub_key is 16 * 56 bits
 void key_schedule(uint64_t key, uint64_t* sub_key){ 
     //key is 64bits with parity bits. left/right are 28.
@@ -158,6 +115,7 @@ void key_schedule(uint64_t key, uint64_t* sub_key){
         }
         // Concatenate
         CD = (C << 28) | D;
+        printf("Key sched %d : %016llx\n", i, CD );
         // Permuted Choice 2
         sub_key[i] = 0;
         for(j = 0; j < 48; j++){
@@ -170,30 +128,102 @@ void key_schedule(uint64_t key, uint64_t* sub_key){
     }
 }
 
-uint32_t f_function(uint32_t R, uint64_t sub_key){
-    register int i, j;
-    uint64_t s_input = 0;
-    uint32_t s_output = 0;
-    // Expansion. 32 in, 48 out.
-    s_input = f_expansion(R) ^ sub_key;
-    // Substitution (S1 to S8)
-    // Each takes 6bits. 0x3F is 6 1's.
-    // 64 bits. 48 useful. Can this be done better using S_tables
-    // structure?
-    for(i = 7; i >= 0; i--){
-        s_output <<= 4;
-        s_output |= f_S(i, (s_input >> 6*i) & 0x3F);
+uint64_t DES_encrypt(uint64_t plaintext, uint64_t key){
+    // Plaintext is 64 bits. Do initial Permutation.
+    // key is 64bits
+    // TODO fix indexing
+    register int i;
+    uint32_t L, R, tmp;
+
+    // Key generation
+    uint64_t sub_key[16] = {0};
+    key_schedule(key, sub_key);
+    printf("KEY %016llx\n", key);
+    printf("SUBKEYS 0: %016llx\n", sub_key[0]);
+
+    // Do IP of plaintext with 5 delta swaps
+    uint64_t B;
+    uint64_t ciphertext = plaintext;
+    printf("Init : %016llx\n", ciphertext);
+    //uint64_t MASK1 = 0xAA00AA00AA00AA00;
+    //uint64_t MASK2 = 0xCCCC0000CCCC0000;
+    //uint64_t MASK3 = 0xF0F0F0F000000000;
+    //uint64_t MASK4 = 0x00FF00FF00000000;
+    //uint64_t MASK5 = 0xFF000000FF000000;
+    //DELTA_SWAP(ciphertext, B,  9, MASK1);
+    //DELTA_SWAP(ciphertext, B, 18, MASK2);
+    //DELTA_SWAP(ciphertext, B, 36, MASK3);
+    //DELTA_SWAP(ciphertext, B, 24, MASK4);
+    //DELTA_SWAP(ciphertext, B, 24, MASK5);
+    uint64_t MASK1 = 0x0055005500550055;
+    uint64_t MASK2 = 0x0000333300003333;
+    uint64_t MASK3 = 0x000000000F0F0F0F;
+    uint64_t MASK4 = 0x00000000FF00FF00;
+    uint64_t MASK5 = 0x000000FF000000FF;
+    DELTA_SWAP_TWO(ciphertext, B,  9, MASK1);
+    DELTA_SWAP_TWO(ciphertext, B, 18, MASK2);
+    DELTA_SWAP_TWO(ciphertext, B, 36, MASK3);
+    DELTA_SWAP_TWO(ciphertext, B, 24, MASK4);
+    DELTA_SWAP_TWO(ciphertext, B, 24, MASK5);
+    printf("IP : %016llx\n", ciphertext);
+    L = ciphertext >> 32 & 0xFFFFFFFF; // 32 1's
+    R = ciphertext & 0xFFFFFFFF;
+    
+    for(i = 0; i < 16; i++){
+        printf("\nRound : %d\n", i);
+        tmp = R;  
+        R = f_function(R, sub_key[i]) ^ L;
+        L = tmp;
+        printf("L[i]: %016llx \nR[i]: %016llx\n", L, R);
     }
-    // Permutation
-    return f_permutation(s_output);
+    // Combine with R on left due to final swap before FP.
+    ciphertext = (uint64_t) R << 32 | L;
+    printf("LR[16]: %016llx \n", ciphertext);
+
+    // Do FP now with 5 delta swaps in reverse order.
+    DELTA_SWAP_TWO(ciphertext, B, 24, MASK5);
+    DELTA_SWAP_TWO(ciphertext, B, 24, MASK4);
+    DELTA_SWAP_TWO(ciphertext, B, 36, MASK3);
+    DELTA_SWAP_TWO(ciphertext, B, 18, MASK2);
+    DELTA_SWAP_TWO(ciphertext, B,  9, MASK1);
+    return ciphertext;
 }
+
+uint32_t f_function(uint32_t R, uint64_t sub_key){
+    register int i;
+    uint64_t s_input;
+    uint32_t s_output = 0;
+    uint8_t f_s_res;
+    // Expansion. 32 in, 48 out.
+    s_input = f_expansion(R);
+    printf("E : %016llx\n", s_input);
+    printf("KS : %016llx\n", sub_key);
+    s_input ^= sub_key;
+    printf("E ^ KS : %016llx\n", s_input);
+    // Substitution (S1 to S8). 48in, 32 out.
+    // Each takes 6bits. 0x3F is 6 1's.
+    for(i = 0; i < 8; i++){
+        s_output <<= 4;
+        // len - 6 - 6*i to take leftmost 6 bits on i=0.
+        f_s_res = f_S(i, (s_input >> (42 - 6*i)) & 0x3F);
+        s_output |= f_s_res;
+        //printf("f_s[%d]: %016llx  ", i, f_s_res);
+    }
+    printf("Sbox : %016llx\n", s_output);
+    // Permutation
+    s_output = f_permutation(s_output);
+    printf("P : %016llx\n", s_output);
+    return s_output;
+}
+
 // 32b in, 48b out
 uint64_t f_expansion(uint32_t x){
-    uint32_t y = 0;
+    uint64_t y = 0;
     for(int i = 0; i < 48; i++){
         //y[i] = x[e_table[i] - 1];
         y <<= 1;
-        y |= x >> (32 - E_table[i]) & 0x1;
+        // 32 not 48 because x is 32b long.
+        y |= (x >> (32 - E_table[i])) & 0x1;
     }
     return y;
 }
@@ -201,11 +231,13 @@ uint64_t f_expansion(uint32_t x){
 // 32b in, 32b out
 uint32_t f_permutation(uint32_t x){
     // Optimize: just operate on x by reference?
-    uint8_t y = 0;
+    uint32_t y = 0;
+    //printf("Perm x : %016llx\n", x);
     for(int i = 0; i < 32; i++){
         //y = x[p_table[i] - 1];
         y <<= 1;
-        y |= x >> (32 - P_table[i]) & 0x1;
+        y |= (x >> (32 - P_table[i])) & 0x1;
+        //printf("Perm y[%d] : %016llx\n", i, y);
     }
     return y;
 }
@@ -213,13 +245,15 @@ uint32_t f_permutation(uint32_t x){
 // x is 6 bits, y is 4 bits.
 uint8_t f_S(int s_index, uint8_t x){
     // Use binary array to get indices
-    int i, col_index, row_index;
+    uint8_t col_index, row_index;
     uint8_t y = 0;
     // Use outer 2 bits for row, inner 4 for col.
     row_index = (x >> 5 & 0x1) << 1 | (x & 0x1);
     col_index = (x >> 1) & 0xF;
     // Get number from S_table and take last 4 bits.
-    y = S_table[s_index][row_index * 16 + col_index] & 0x0F; 
+    y = S_table[s_index][row_index * 16 + col_index] & 0xF; 
     return y;
 }
 
+// 01101111 00010110 11110001 01101111 01111101 11111001
+// 01101111 00010110 11110001 01101111 01111101 11111001
