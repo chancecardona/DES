@@ -12,10 +12,13 @@ int main(int argc, const char * argv[]){
     uint64_t ciphertext; 
 
     // Call DES_crypt for each 64 bit chunk
-    ciphertext = DES_encrypt(plaintext, key); 
+    ciphertext = DES_encrypt(plaintext, key, EN0); 
     // Print Ciphertext
     // Plain: 0x9474B8E8C73BCA7D Expect 0x6eb6aaea4261f4b8
     // Plain: 0x0000000000000000 Expect 0x8ca64de9c1b123a7
     printf("Ciphertext: %016llx\n.", ciphertext);
+    // Now decrypt
+    plaintext = DES_encrypt(ciphertext, key, DE1); 
+    printf("Decrypted plaintext: %016llx\n.", plaintext);
 }
 

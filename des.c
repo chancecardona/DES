@@ -128,11 +128,10 @@ void key_schedule(uint64_t key, uint64_t* sub_key){
     }
 }
 
-uint64_t DES_encrypt(uint64_t plaintext, uint64_t key){
-    // Plaintext is 64 bits. Do initial Permutation.
-    // key is 64bits
-    // TODO fix indexing
+uint64_t DES_encrypt(uint64_t plaintext, uint64_t key, unsigned char decrypt){
+    // Plaintext and Key are 64 bits
     register int i;
+    int key_index;
     uint32_t L, R, tmp;
 
     // Key generation
@@ -145,34 +144,39 @@ uint64_t DES_encrypt(uint64_t plaintext, uint64_t key){
     uint64_t B;
     uint64_t ciphertext = plaintext;
     printf("Init : %016llx\n", ciphertext);
-    //uint64_t MASK1 = 0xAA00AA00AA00AA00;
-    //uint64_t MASK2 = 0xCCCC0000CCCC0000;
-    //uint64_t MASK3 = 0xF0F0F0F000000000;
-    //uint64_t MASK4 = 0x00FF00FF00000000;
-    //uint64_t MASK5 = 0xFF000000FF000000;
-    //DELTA_SWAP(ciphertext, B,  9, MASK1);
-    //DELTA_SWAP(ciphertext, B, 18, MASK2);
-    //DELTA_SWAP(ciphertext, B, 36, MASK3);
-    //DELTA_SWAP(ciphertext, B, 24, MASK4);
-    //DELTA_SWAP(ciphertext, B, 24, MASK5);
-    uint64_t MASK1 = 0x0055005500550055;
-    uint64_t MASK2 = 0x0000333300003333;
-    uint64_t MASK3 = 0x000000000F0F0F0F;
-    uint64_t MASK4 = 0x00000000FF00FF00;
-    uint64_t MASK5 = 0x000000FF000000FF;
-    DELTA_SWAP_TWO(ciphertext, B,  9, MASK1);
-    DELTA_SWAP_TWO(ciphertext, B, 18, MASK2);
-    DELTA_SWAP_TWO(ciphertext, B, 36, MASK3);
-    DELTA_SWAP_TWO(ciphertext, B, 24, MASK4);
-    DELTA_SWAP_TWO(ciphertext, B, 24, MASK5);
+    uint64_t MASK1 = 0xAA00AA00AA00AA00;
+    uint64_t MASK2 = 0xCCCC0000CCCC0000;
+    uint64_t MASK3 = 0xF0F0F0F000000000;
+    uint64_t MASK4 = 0x00FF00FF00000000;
+    uint64_t MASK5 = 0xFF000000FF000000;
+    DELTA_SWAP(ciphertext, B,  9, MASK1);
+    DELTA_SWAP(ciphertext, B, 18, MASK2);
+    DELTA_SWAP(ciphertext, B, 36, MASK3);
+    DELTA_SWAP(ciphertext, B, 24, MASK4);
+    DELTA_SWAP(ciphertext, B, 24, MASK5);
+    //uint64_t MASK1 = 0x0055005500550055;
+    //uint64_t MASK2 = 0x0000333300003333;
+    //uint64_t MASK3 = 0x000000000F0F0F0F;
+    //uint64_t MASK4 = 0x00000000FF00FF00;
+    //uint64_t MASK5 = 0x000000FF000000FF;
+    //DELTA_SWAP_TWO(ciphertext, B,  9, MASK1);
+    //DELTA_SWAP_TWO(ciphertext, B, 18, MASK2);
+    //DELTA_SWAP_TWO(ciphertext, B, 36, MASK3);
+    //DELTA_SWAP_TWO(ciphertext, B, 24, MASK4);
+    //DELTA_SWAP_TWO(ciphertext, B, 24, MASK5);
     printf("IP : %016llx\n", ciphertext);
     L = ciphertext >> 32 & 0xFFFFFFFF; // 32 1's
     R = ciphertext & 0xFFFFFFFF;
     
     for(i = 0; i < 16; i++){
+        if(decrypt){
+            key_index = 15 - i;
+        } else {
+            key_index = i;
+        }
         printf("\nRound : %d\n", i);
         tmp = R;  
-        R = f_function(R, sub_key[i]) ^ L;
+        R = f_function(R, sub_key[key_index]) ^ L;
         L = tmp;
         printf("L[i]: %016llx \nR[i]: %016llx\n", L, R);
     }
@@ -181,11 +185,16 @@ uint64_t DES_encrypt(uint64_t plaintext, uint64_t key){
     printf("LR[16]: %016llx \n", ciphertext);
 
     // Do FP now with 5 delta swaps in reverse order.
-    DELTA_SWAP_TWO(ciphertext, B, 24, MASK5);
-    DELTA_SWAP_TWO(ciphertext, B, 24, MASK4);
-    DELTA_SWAP_TWO(ciphertext, B, 36, MASK3);
-    DELTA_SWAP_TWO(ciphertext, B, 18, MASK2);
-    DELTA_SWAP_TWO(ciphertext, B,  9, MASK1);
+    DELTA_SWAP(ciphertext, B, 24, MASK5);
+    DELTA_SWAP(ciphertext, B, 24, MASK4);
+    DELTA_SWAP(ciphertext, B, 36, MASK3);
+    DELTA_SWAP(ciphertext, B, 18, MASK2);
+    DELTA_SWAP(ciphertext, B,  9, MASK1);
+    //DELTA_SWAP_TWO(ciphertext, B, 24, MASK5);
+    //DELTA_SWAP_TWO(ciphertext, B, 24, MASK4);
+    //DELTA_SWAP_TWO(ciphertext, B, 36, MASK3);
+    //DELTA_SWAP_TWO(ciphertext, B, 18, MASK2);
+    //DELTA_SWAP_TWO(ciphertext, B,  9, MASK1);
     return ciphertext;
 }
 
@@ -254,6 +263,3 @@ uint8_t f_S(int s_index, uint8_t x){
     y = S_table[s_index][row_index * 16 + col_index] & 0xF; 
     return y;
 }
-
-// 01101111 00010110 11110001 01101111 01111101 11111001
-// 01101111 00010110 11110001 01101111 01111101 11111001

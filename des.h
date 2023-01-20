@@ -1,7 +1,10 @@
 #ifndef DES_H_
 #define DES_H_
 
-uint64_t DES_encrypt(uint64_t plaintext, uint64_t key);
+#define EN0 0   /* MODE == encrypt */
+#define DE1 1   /* MODE == decrypt */
+
+uint64_t DES_encrypt(uint64_t plaintext, uint64_t key, unsigned char decrypt);
 
 void key_schedule(uint64_t key, uint64_t* sub_key);
 
