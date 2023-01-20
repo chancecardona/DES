@@ -53,7 +53,8 @@ Masks used are explained here:
   selects 1st and 5th rows, with delta 24 swaps them.  
 This utilizes 30 bit operations total. Alternatives include bfly tables.
 
+## Debugging
+Useful for debugging: http://styere.xyz/JS-DES.html just edit form to not be readonly.
+
 ## TODO:
-- Separate into different files
-- Use C registers for speedhttps://www.c-programming-simple-steps.com/c-register.html
-- Replace row indexing with bitwise shifts
+- Utilize structures of P, E, PC-1, and PC-2 tables for more efficient bit ops.
